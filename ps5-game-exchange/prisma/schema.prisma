@@ -1,0 +1,162 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                String    @id @default(cuid())
+  email             String    @unique
+  password          String
+  name              String?
+  avatar            String?
+  bio               String?
+  isVerified        Boolean   @default(false)
+  isAdmin           Boolean   @default(false)
+  resetToken        String?
+  resetTokenExpiry  DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Relations
+  listings          Listing[]
+  purchases         Order[]   @relation("BuyerOrders")
+  sales             Order[]   @relation("SellerOrders")
+  sentMessages      Message[] @relation("SentMessages")
+  receivedMessages  Message[] @relation("ReceivedMessages")
+  reviews           Review[]
+  notifications     Notification[]
+}
+
+model Listing {
+  id              String    @id @default(cuid())
+  title           String
+  description     String
+  price           Float
+  condition       Condition @default(LIKE_NEW)
+  images          String[]
+  status          ListingStatus @default(ACTIVE)
+  views           Int       @default(0)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Relations
+  sellerId        String
+  seller          User      @relation(fields: [sellerId], references: [id])
+  orders          Order[]
+  reviews         Review[]
+  
+  @@index([sellerId])
+  @@index([status])
+  @@index([title])
+}
+
+model Order {
+  id              String    @id @default(cuid())
+  orderNumber     String    @unique
+  total           Float
+  status          OrderStatus @default(PENDING)
+  paymentIntentId String?
+  shippingAddress Json?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Relations
+  buyerId         String
+  buyer           User      @relation("BuyerOrders", fields: [buyerId], references: [id])
+  sellerId        String
+  seller          User      @relation("SellerOrders", fields: [sellerId], references: [id])
+  listingId       String
+  listing         Listing   @relation(fields: [listingId], references: [id])
+  
+  @@index([buyerId])
+  @@index([sellerId])
+  @@index([orderNumber])
+}
+
+model Message {
+  id              String    @id @default(cuid())
+  content         String
+  read            Boolean   @default(false)
+  createdAt       DateTime  @default(now())
+
+  // Relations
+  senderId        String
+  sender          User      @relation("SentMessages", fields: [senderId], references: [id])
+  receiverId      String
+  receiver        User      @relation("ReceivedMessages", fields: [receiverId], references: [id])
+  
+  @@index([senderId])
+  @@index([receiverId])
+}
+
+model Review {
+  id              String    @id @default(cuid())
+  rating          Int
+  comment         String?
+  createdAt       DateTime  @default(now())
+
+  // Relations
+  userId          String
+  user            User      @relation(fields: [userId], references: [id])
+  listingId       String
+  listing         Listing   @relation(fields: [listingId], references: [id])
+  
+  @@unique([userId, listingId])
+  @@index([listingId])
+}
+
+model Notification {
+  id              String    @id @default(cuid())
+  type            NotificationType
+  title           String
+  message         String
+  read            Boolean   @default(false)
+  data            Json?
+  createdAt       DateTime  @default(now())
+
+  // Relations
+  userId          String
+  user            User      @relation(fields: [userId], references: [id])
+  
+  @@index([userId])
+}
+
+enum Condition {
+  NEW
+  LIKE_NEW
+  VERY_GOOD
+  GOOD
+  ACCEPTABLE
+}
+
+enum ListingStatus {
+  ACTIVE
+  SOLD
+  INACTIVE
+  DELETED
+}
+
+enum OrderStatus {
+  PENDING
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+  REFUNDED
+}
+
+enum NotificationType {
+  ORDER_PLACED
+  ORDER_SHIPPED
+  ORDER_DELIVERED
+  MESSAGE_RECEIVED
+  REVIEW_RECEIVED
+  LISTING_SOLD
+}
